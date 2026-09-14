@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>个人简历</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 40px 20px; background: #eef2f6; color: #263445; font-family: "Microsoft YaHei", Arial, sans-serif; line-height: 1.8; }
+    main { max-width: 880px; margin: auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 12px 40px #26344512; }
+    header { padding: 40px; background: #203e56; color: white; }
+    .label { margin: 0; color: #bcd7e9; font-size: 13px; letter-spacing: 3px; }
+    h1 { margin: 10px 0 4px; font-size: 36px; }
+    header p { margin: 6px 0; }
+    .contact { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 6px 24px; font-size: 14px; color: #dbe8f1; }
+    .content { padding: 12px 40px 32px; }
+    section { margin-top: 26px; }
+    h2 { padding-bottom: 8px; border-bottom: 2px solid #e8eef3; font-size: 19px; color: #203e56; }
+    h3 { margin: 12px 0 4px; font-size: 16px; }
+    p { margin: 8px 0; }
+    .meta { color: #66788a; font-size: 14px; }
+    .skills { display: flex; flex-wrap: wrap; gap: 10px; padding: 0; list-style: none; }
+    .skills li { padding: 5px 15px; background: #eef4f8; color: #315a77; border-radius: 6px; }
+    ul { padding-left: 22px; }
+    footer { padding: 18px 40px; border-top: 1px solid #edf0f3; color: #788697; font-size: 12px; }
+    @media (max-width: 600px) { body { padding: 16px 12px; } header { padding: 28px 24px; } .content { padding: 8px 24px 28px; } h1 { font-size: 30px; } footer { padding: 16px 24px; } }
+    @media print { body { padding: 0; background: white; } main { box-shadow: none; border-radius: 0; } section { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <main>
+    <!-- 以下为示例简历，请根据个人情况修改。 -->
+    <header>
+      <p class="label">PERSONAL RESUME / 个人简历</p>
+      <h1>张三</h1>
+      <p>求职意向：前端开发实习生</p>
+      <div class="contact">
+        <span>所在地：上海</span>
+        <span>电话：138-0000-0000</span>
+        <span>邮箱：zhangsan@example.com</span>
+      </div>
+    </header>
+    <div class="content">
+      <section aria-labelledby="about">
+        <h2 id="about">个人简介</h2>
+        <p>计算机专业在校生，热爱网页设计与前端开发，注重页面细节和用户体验。具备良好的学习能力与团队协作意识，希望通过实践不断提升开发能力。</p>
+      </section>
+      <section aria-labelledby="education">
+        <h2 id="education">教育背景</h2>
+        <h3>某某大学 · 计算机科学与技术</h3>
+        <p class="meta">2023.09 — 2027.06（预计） | 本科</p>
+        <p>主修课程：Web 前端开发、数据结构、数据库原理、计算机网络、软件工程。</p>
+      </section>
+      <section aria-labelledby="skills">
+        <h2 id="skills">专业技能</h2>
+        <ul class="skills"><li>HTML5</li><li>CSS3</li><li>JavaScript</li><li>Git</li><li>响应式布局</li></ul>
+        <ul>
+          <li>掌握 HTML 常用标签，能够编写结构清晰的网页。</li>
+          <li>熟悉 CSS 样式与 Flex 布局，能够适配手机和电脑屏幕。</li>
+          <li>了解 JavaScript 基础语法与 DOM 操作，能够实现简单页面交互。</li>
+        </ul>
+      </section>
+      <section aria-labelledby="projects">
+        <h2 id="projects">项目经历</h2>
+        <h3>个人简历网页</h3>
+        <p class="meta">课程练习 | HTML + CSS</p>
+        <ul>
+          <li>独立完成页面结构与样式，展示个人信息、教育背景和专业技能。</li>
+          <li>使用媒体查询实现响应式布局，优化不同屏幕下的阅读体验。</li>
+          <li>通过 Git 进行版本管理，记录开发过程。</li>
+        </ul>
+      </section>
+      <section aria-labelledby="interests">
+        <h2 id="interests">兴趣爱好</h2>
+        <p>编程、阅读、摄影、羽毛球。喜欢探索新技术，也乐于分享学习心得。</p>
+      </section>
+    </div>
+    <footer>本页为个人简历示例，姓名、联系方式及经历均可替换。</footer>
+  </main>
+</body>
+</html>
