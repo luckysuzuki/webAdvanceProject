@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>earth02 · 经纬网</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#040a14;color:#eaf2ff;
+    font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  #c{display:block;width:100%;height:100%}
+  .hud{position:fixed;left:36px;top:32px;z-index:2;pointer-events:none}
+  .hud .t{font-size:28px;font-weight:800;letter-spacing:.5px}
+  .hud .s{margin-top:8px;font-size:14px;color:#8ea4bf}
+  .panel{position:fixed;right:26px;top:26px;width:316px;z-index:3;
+    border:1px solid #1f3550;border-radius:16px;padding:20px;background:rgba(8,19,32,.9)}
+  .tag{display:inline-block;padding:4px 10px;border-radius:999px;
+    background:#12263b;color:#8ec6f0;font-size:12px;margin-bottom:12px}
+  .panel h3{margin:0 0 12px;font-size:17px}
+  .panel p{margin:9px 0;font-size:13.5px;line-height:1.68;color:#b3c3d6}
+  .panel b{color:#ffd166;font-weight:600}
+  .lg{display:flex;align-items:center;gap:9px;margin:7px 0;font-size:13px;color:#b3c3d6}
+  .sw{width:22px;height:0;border-top-width:3px;border-top-style:solid;flex:none}
+  .btns{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
+  .btn{border:1px solid #2d4a68;background:#102137;color:#dbe8f7;border-radius:9px;
+    padding:8px 13px;cursor:pointer;font-size:13px;font-family:inherit}
+  .btn:hover{background:#18304b;border-color:#3d7fb5}
+  .btn.on{background:#1d4a72;border-color:#4d9ad6;color:#eaf6ff}
+  .nav{position:fixed;left:36px;bottom:26px;z-index:3;display:flex;gap:18px}
+  .nav a{color:#9dc6ee;text-decoration:none;font-size:13.5px;padding:7px 13px;
+    border:1px solid #1f3550;border-radius:9px;background:rgba(8,19,32,.8)}
+  .nav a:hover{background:#14293f;border-color:#3d7fb5}
+  .lock{position:fixed;left:36px;top:auto;bottom:92px;z-index:3;font-size:13px;
+    color:#7f93ab;border:1px dashed #24384f;border-radius:10px;padding:9px 14px;
+    background:rgba(8,19,32,.7);max-width:330px;line-height:1.6}
+  .lock b{color:#8ec6f0}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="hud">
+  <div class="t">earth02 · 经纬网</div>
+  <div class="s">静止视角 · 正对本初子午线（0° 经线）</div>
+</div>
+
+<div class="panel">
+  <span class="tag">第 2 节 / 共 6 节</span>
+  <h3>经线 · 纬线 · 赤道</h3>
+  <p><b>纬线</b>是东西方向的一圈圈圆，互相平行，长度不等；中间最长的那一圈就是<b>赤道（0° 纬线）</b>。</p>
+  <p><b>经线</b>是南北方向连接两极的半圆，长度都相等，都汇聚于南北两极；其中穿过英国格林尼治的那一条是<b>本初子午线（0° 经线）</b>。</p>
+  <div class="lg"><span class="sw" style="border-top-color:#ffd166"></span>赤道（0° 纬线）</div>
+  <div class="lg"><span class="sw" style="border-top-color:#5fd8ff"></span>本初子午线（0° 经线）</div>
+  <div class="lg"><span class="sw" style="border-top-color:rgba(153,194,226,.55)"></span>其他经纬线（每 30° 一条）</div>
+  <div class="btns">
+    <button class="btn on" id="bGrid">经纬网：开</button>
+    <button class="btn on" id="bMark">高亮 0° 线</button>
+    <button class="btn" id="bZoomIn">放大</button>
+    <button class="btn" id="bZoomOut">缩小</button>
+  </div>
+</div>
+
+<div class="lock">
+  本节<b>锁定为静止视角</b>，让 0° 经线正好正对屏幕中心，方便看清经纬线的走向。<br>
+  拖拽旋转将在下一节（earth03）开放。
+</div>
+
+<div class="nav">
+  <a href="earth01.html">← 上一节：基础球体</a>
+  <a href="index.html">返回导航</a>
+  <a href="earth03.html">下一节：城市标注 →</a>
+</div>
+
+<script>
+/* ===================================================================
+   共享三维核心（与 earth01 相同）
+   =================================================================== */
+const DEG = Math.PI/180;
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let W=0, H=0, DPR=1, R=320;
+/* 静止视角：正对本初子午线 —— rotY = π/2 使 (lat,0) 落在屏幕中心 */
+const ROT_Y_LOCK = Math.PI/2;
+let rotY = ROT_Y_LOCK;
+let rotX = 0;            // 俯仰归零，赤道成为一条水平直线
+let zoom = 1, spin = 0;
+let showGrid = true, showMark = true;
+
+function layout(){
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  canvas.width = Math.round(W*DPR);
+  canvas.height = Math.round(H*DPR);
+  canvas.style.width = W+'px';
+  canvas.style.height = H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  R = Math.min(W*0.30, H*0.42) * zoom;
+  buildStars();
+}
+function CX(){ return W/2 - Math.min(158, W*0.085); }
+function CY(){ return H/2; }
+
+function toView(lat, lon, r){
+  if(r === undefined) r = 1;
+  const a  = (lon + spin)*DEG + rotY;
+  const la = lat*DEG, cl = Math.cos(la);
+  const x = r*cl*Math.cos(a);
+  const y = r*Math.sin(la);
+  const z = r*cl*Math.sin(a);
+  const c = Math.cos(rotX), s = Math.sin(rotX);
+  return [x, y*c - z*s, y*s + z*c];
+}
+function PX(v){ return CX() + v[0]*R; }
+function PY(v){ return CY() - v[1]*R; }
+
+/* --------------------------- 背景星空 --------------------------- */
+let stars = [];
+function buildStars(){
+  let seed = 987654321;
+  const rnd = () => (seed = (seed*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  stars = [];
+  const n = Math.round(W*H/3200);
+  for(let i=0;i<n;i++) stars.push(rnd()*W, rnd()*H, rnd()*1.4+.3, rnd()*.5+.12);
+}
+function drawBG(){
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#03080f');
+  g.addColorStop(1,'#07131f');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  for(let i=0;i<stars.length;i+=4){
+    ctx.fillStyle = 'rgba(226,240,255,'+stars[i+3].toFixed(3)+')';
+    ctx.fillRect(stars[i], stars[i+1], stars[i+2], stars[i+2]);
+  }
+}
+
+/* --------------------------- 球体本体 --------------------------- */
+function drawGlobe(){
+  const cx = CX(), cy = CY();
+  const g = ctx.createRadialGradient(
+    cx - R*0.36, cy - R*0.40, R*0.06,
+    cx,          cy,          R*1.08);
+  g.addColorStop(0,   '#3f8fc4');
+  g.addColorStop(0.42,'#1f5f8e');
+  g.addColorStop(0.78,'#123f60');
+  g.addColorStop(1,   '#08202f');
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2);
+  ctx.fillStyle = g; ctx.fill();
+
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2); ctx.clip();
+  const rim = ctx.createRadialGradient(cx, cy, R*0.80, cx, cy, R);
+  rim.addColorStop(0, 'rgba(150,215,255,0)');
+  rim.addColorStop(1, 'rgba(150,215,255,.30)');
+  ctx.fillStyle = rim; ctx.fillRect(cx-R, cy-R, R*2, R*2);
+  ctx.restore();
+}
+
+/* ------------- 画一条球面折线（自动做临边裁剪） -------------
+   只在 z >= 0 的正面绘制；由正面跨到背面时，
+   在 z = 0 处插值出临边点，保证线条正好止于轮廓圆。   */
+function strokeCurve(pts, color, width, dash){
+  ctx.save();
+  if(dash) ctx.setLineDash(dash);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  let started = false, prev = null;
+  for(let i=0;i<pts.length;i++){
+    const v = toView(pts[i][0], pts[i][1]);
+    if(v[2] >= 0){
+      const x = PX(v), y = PY(v);
+      if(started) ctx.lineTo(x,y);
+      else { ctx.moveTo(x,y); started = true; }
+      prev = v;
+    }else{
+      if(started && prev){
+        const t = prev[2] / (prev[2] - v[2]);
+        const bx = prev[0] + (v[0]-prev[0])*t;
+        const by = prev[1] + (v[1]-prev[1])*t;
+        ctx.lineTo(CX()+bx*R, CY()-by*R);
+      }
+      started = false; prev = null;
+    }
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* --------------------------- 经纬网 --------------------------- */
+function parallel(lat){
+  const p = [];
+  for(let lon=-180; lon<=180; lon+=3) p.push([lat,lon]);
+  return p;
+}
+function meridian(lon){
+  const p = [];
+  for(let lat=-90; lat<=90; lat+=3) p.push([lat,lon]);
+  return p;
+}
+
+function drawGrid(){
+  if(showGrid){
+    // 纬线：±30°、±60°（赤道单独高亮，这里跳过 0°）
+    for(let lat=-60; lat<=60; lat+=30){
+      if(lat === 0) continue;
+      strokeCurve(parallel(lat), 'rgba(153,194,226,.34)', 1);
+    }
+    // 经线：每 30°，跳过 0°（本初子午线单独高亮）
+    for(let lon=-180; lon<180; lon+=30){
+      if(lon === 0) continue;
+      strokeCurve(meridian(lon), 'rgba(153,194,226,.34)', 1);
+    }
+  }
+  if(showMark){
+    // 赤道：0° 纬线 —— 屏幕上是一条水平直线
+    strokeCurve(parallel(0), '#ffd166', 3.2);
+    // 本初子午线：0° 经线 —— 屏幕上是一条竖直直线
+    strokeCurve(meridian(0), '#5fd8ff', 3.2);
+  }
+}
+
+/* --------------------------- 文字标注 --------------------------- */
+function label(text, lat, lon, dx, dy, color, align){
+  const v = toView(lat, lon);
+  if(v[2] < 0) return;
+  ctx.fillStyle = color;
+  ctx.font = 'bold 14px system-ui';
+  ctx.textAlign = align || 'left';
+  ctx.fillText(text, PX(v)+dx, PY(v)+dy);
+  ctx.textAlign = 'left';
+}
+function drawLabels(){
+  if(showMark){
+    label('赤道 0°', 0,  58, 10, -9, '#ffd166');
+    label('本初子午线 0°', 62, 0, 9, 0, '#5fd8ff');
+  }
+  if(showGrid){
+    label('30°N',  30, 58, 11, 4,  'rgba(190,214,238,.85)');
+    label('30°S', -30, 58, 11, 4,  'rgba(190,214,238,.85)');
+    label('60°N',  60, 58, 11, 4,  'rgba(190,214,238,.85)');
+    label('60°S', -60, 58, 11, 4,  'rgba(190,214,238,.85)');
+  }
+  // 南北两极
+  label('北极', 90, 0, -14, -10, 'rgba(210,232,255,.9)', 'center');
+  label('南极',-90, 0, -14,  20, 'rgba(210,232,255,.9)', 'center');
+}
+
+function frame(){
+  ctx.clearRect(0,0,W,H);
+  drawBG();
+  drawGlobe();
+  drawGrid();
+  drawLabels();
+  requestAnimationFrame(frame);
+}
+
+/* --------------------------- 交互 --------------------------- */
+function setZoom(z){
+  zoom = Math.max(0.65, Math.min(1.7, z));
+  layout();
+}
+const bGrid = document.getElementById('bGrid');
+bGrid.onclick = () => {
+  showGrid = !showGrid;
+  bGrid.textContent = '经纬网：' + (showGrid ? '开' : '关');
+  bGrid.classList.toggle('on', showGrid);
+};
+const bMark = document.getElementById('bMark');
+bMark.onclick = () => {
+  showMark = !showMark;
+  bMark.classList.toggle('on', showMark);
+};
+document.getElementById('bZoomIn').onclick  = () => setZoom(zoom*1.15);
+document.getElementById('bZoomOut').onclick = () => setZoom(zoom/1.15);
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  setZoom(zoom * (e.deltaY < 0 ? 1.08 : 0.93));
+}, {passive:false});
+
+addEventListener('resize', layout);
+layout();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

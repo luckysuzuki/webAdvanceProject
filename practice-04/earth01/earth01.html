@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>earth01 · 基础球体</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#040a14;color:#eaf2ff;
+    font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  #c{display:block;width:100%;height:100%}
+  .hud{position:fixed;left:36px;top:32px;z-index:2;pointer-events:none}
+  .hud .t{font-size:28px;font-weight:800;letter-spacing:.5px}
+  .hud .s{margin-top:8px;font-size:14px;color:#8ea4bf}
+  .panel{position:fixed;right:26px;top:26px;width:316px;z-index:3;
+    border:1px solid #1f3550;border-radius:16px;padding:20px;background:rgba(8,19,32,.9)}
+  .tag{display:inline-block;padding:4px 10px;border-radius:999px;
+    background:#12263b;color:#8ec6f0;font-size:12px;margin-bottom:12px}
+  .panel h3{margin:0 0 12px;font-size:17px}
+  .panel p{margin:9px 0;font-size:13.5px;line-height:1.68;color:#b3c3d6}
+  .panel b{color:#ffd166;font-weight:600}
+  .btns{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
+  .btn{border:1px solid #2d4a68;background:#102137;color:#dbe8f7;border-radius:9px;
+    padding:8px 13px;cursor:pointer;font-size:13px;font-family:inherit}
+  .btn:hover{background:#18304b;border-color:#3d7fb5}
+  .btn.on{background:#1d4a72;border-color:#4d9ad6;color:#eaf6ff}
+  .nav{position:fixed;left:36px;bottom:26px;z-index:3;display:flex;gap:18px}
+  .nav a{color:#9dc6ee;text-decoration:none;font-size:13.5px;padding:7px 13px;
+    border:1px solid #1f3550;border-radius:9px;background:rgba(8,19,32,.8)}
+  .nav a:hover{background:#14293f;border-color:#3d7fb5}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="hud">
+  <div class="t">earth01 · 基础球体</div>
+  <div class="s">拖拽旋转 · 滚轮缩放 —— 后续所有章节的共同基础</div>
+</div>
+
+<div class="panel">
+  <span class="tag">第 1 节 / 共 6 节</span>
+  <h3>地球是一个球体</h3>
+  <p>用最简单的<b>球体轮廓</b>建立空间感：无论从哪个方向拖拽，看到的都是同一个球，边缘永远是一个<b>圆</b>。</p>
+  <p>球面上的光影随视线变化，说明我们面对的是一颗立体的球，而不是平面上画的一个圆。</p>
+  <div class="btns">
+    <button class="btn on" id="bAuto">自转：开</button>
+    <button class="btn" id="bLine">显示轮廓</button>
+    <button class="btn" id="bReset">重置视角</button>
+  </div>
+</div>
+
+<div class="nav">
+  <a href="index.html">← 返回导航</a>
+  <a href="earth02.html">下一节：经纬网 →</a>
+</div>
+
+<script>
+/* ===================================================================
+   共享三维核心：经纬度 (lat, lon) → 球面三维坐标 → 屏幕二维坐标
+   采用正交投影，z>0 表示该点位于朝向观察者的正面。
+   =================================================================== */
+const DEG = Math.PI/180;
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let W=0, H=0, DPR=1, R=320;
+let rotY = Math.PI/2;   // 视角绕地轴旋转（本页默认正对 0° 经线）
+let rotX = -0.30;       // 视角俯仰，略微俯视更有立体感
+let zoom = 1, spin = 0;
+let auto = true, showLine = false;
+let dragging = false, lastX = 0, lastY = 0;
+
+function layout(){
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  canvas.width = Math.round(W*DPR);
+  canvas.height = Math.round(H*DPR);
+  canvas.style.width = W+'px';
+  canvas.style.height = H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  R = Math.min(W*0.30, H*0.42) * zoom;
+  buildStars();
+}
+/* 球心略向左偏，给右侧讲解面板留出空间 */
+function CX(){ return W/2 - Math.min(158, W*0.085); }
+function CY(){ return H/2; }
+
+/* 经纬度 → 视角坐标。r 为该点到地心的距离（默认 1，即地表） */
+function toView(lat, lon, r){
+  if(r === undefined) r = 1;
+  const a  = (lon + spin)*DEG + rotY;
+  const la = lat*DEG, cl = Math.cos(la);
+  const x = r*cl*Math.cos(a);
+  const y = r*Math.sin(la);
+  const z = r*cl*Math.sin(a);
+  // 视角俯仰：绕屏幕 X 轴旋转
+  const c = Math.cos(rotX), s = Math.sin(rotX);
+  return [x, y*c - z*s, y*s + z*c];
+}
+function PX(v){ return CX() + v[0]*R; }
+function PY(v){ return CY() - v[1]*R; }
+
+/* --------------------------- 背景星空 --------------------------- */
+let stars = [];
+function buildStars(){
+  let seed = 987654321;
+  const rnd = () => (seed = (seed*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  stars = [];
+  const n = Math.round(W*H/3200);
+  for(let i=0;i<n;i++) stars.push(rnd()*W, rnd()*H, rnd()*1.4+.3, rnd()*.5+.12);
+}
+function drawBG(){
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#03080f');
+  g.addColorStop(1,'#07131f');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,W,H);
+  for(let i=0;i<stars.length;i+=4){
+    ctx.fillStyle = 'rgba(226,240,255,'+stars[i+3].toFixed(3)+')';
+    ctx.fillRect(stars[i], stars[i+1], stars[i+2], stars[i+2]);
+  }
+}
+
+/* --------------------------- 球体本体 --------------------------- */
+/* 大面积平滑渐变在 8 位色深下会出现同心色带，叠一层极低透明度噪点即可打散 */
+let noisePat = null;
+function drawNoise(){
+  const cx = CX(), cy = CY();
+  if(!noisePat){
+    const n = document.createElement('canvas');
+    n.width = n.height = 96;
+    const g = n.getContext('2d');
+    const img = g.createImageData(96,96);
+    let seed = 20240921;
+    for(let i=0;i<img.data.length;i+=4){
+      seed = (seed*1103515245 + 12345) & 0x7fffffff;
+      const v = (seed >>> 16) & 255;
+      img.data[i] = img.data[i+1] = img.data[i+2] = v;
+      img.data[i+3] = 255;
+    }
+    g.putImageData(img,0,0);
+    noisePat = ctx.createPattern(n, 'repeat');
+  }
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.clip();
+  ctx.globalAlpha = 0.032;
+  ctx.fillStyle = noisePat;
+  ctx.fillRect(cx-R, cy-R, R*2, R*2);
+  ctx.restore();
+}
+
+function drawGlobe(){
+  const cx = CX(), cy = CY();
+  // 球体：用径向渐变模拟单一方向光源，产生立体感
+  const g = ctx.createRadialGradient(
+    cx - R*0.36, cy - R*0.40, R*0.06,
+    cx,          cy,          R*1.08
+  );
+  g.addColorStop(0,   '#3f8fc4');
+  g.addColorStop(0.42,'#1f5f8e');
+  g.addColorStop(0.78,'#123f60');
+  g.addColorStop(1,   '#08202f');
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2);
+  ctx.fillStyle = g; ctx.fill();
+
+  // 边缘弧光（大气层）
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2); ctx.clip();
+  const rim = ctx.createRadialGradient(cx, cy, R*0.80, cx, cy, R);
+  rim.addColorStop(0, 'rgba(150,215,255,0)');
+  rim.addColorStop(1, 'rgba(150,215,255,.30)');
+  ctx.fillStyle = rim; ctx.fillRect(cx-R, cy-R, R*2, R*2);
+  ctx.restore();
+
+  drawNoise();
+
+  // 轮廓线：强调"看到的边缘是一个正圆"
+  if(showLine){
+    ctx.save();
+    ctx.setLineDash([7,7]);
+    ctx.strokeStyle = 'rgba(255,214,110,.85)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = 'rgba(255,214,110,.92)';
+    ctx.font = '14px system-ui';
+    ctx.fillText('球体轮廓 = 正圆', cx + R*0.52, cy - R*1.02);
+  }
+}
+
+/* --------------------------- 主循环 --------------------------- */
+function frame(){
+  if(auto && !dragging){
+    spin += 0.0035;          // 自西向东自转
+    if(spin > Math.PI*2) spin -= Math.PI*2;
+  }
+  ctx.clearRect(0,0,W,H);
+  drawBG();
+  drawGlobe();
+  requestAnimationFrame(frame);
+}
+
+/* --------------------------- 交互 --------------------------- */
+canvas.addEventListener('pointerdown', e => {
+  dragging = true; lastX = e.clientX; lastY = e.clientY;
+  canvas.setPointerCapture(e.pointerId);
+  canvas.style.cursor = 'grabbing';
+});
+canvas.addEventListener('pointermove', e => {
+  if(!dragging) return;
+  rotY += (e.clientX - lastX)*0.0085;
+  rotX += (e.clientY - lastY)*0.0062;
+  rotX = Math.max(-1.25, Math.min(1.25, rotX));
+  lastX = e.clientX; lastY = e.clientY;
+});
+canvas.addEventListener('pointerup', e => {
+  dragging = false;
+  canvas.style.cursor = 'grab';
+  try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  zoom *= e.deltaY < 0 ? 1.08 : 0.93;
+  zoom = Math.max(0.65, Math.min(1.7, zoom));
+  layout();
+}, {passive:false});
+canvas.style.cursor = 'grab';
+
+const bAuto = document.getElementById('bAuto');
+bAuto.onclick = () => {
+  auto = !auto;
+  bAuto.textContent = '自转：' + (auto ? '开' : '关');
+  bAuto.classList.toggle('on', auto);
+};
+const bLine = document.getElementById('bLine');
+bLine.onclick = () => {
+  showLine = !showLine;
+  bLine.classList.toggle('on', showLine);
+};
+document.getElementById('bReset').onclick = () => {
+  rotY = Math.PI/2; rotX = -0.30; zoom = 1; spin = 0; layout();
+};
+
+addEventListener('resize', layout);
+layout();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

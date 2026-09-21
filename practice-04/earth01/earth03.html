@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>earth03 · 城市标注</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#040a14;color:#eaf2ff;
+    font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  #c{display:block;width:100%;height:100%}
+  .hud{position:fixed;left:36px;top:32px;z-index:2;pointer-events:none}
+  .hud .t{font-size:28px;font-weight:800;letter-spacing:.5px}
+  .hud .s{margin-top:8px;font-size:14px;color:#8ea4bf}
+  .panel{position:fixed;right:26px;top:26px;width:330px;z-index:3;
+    border:1px solid #1f3550;border-radius:16px;padding:20px;background:rgba(8,19,32,.9)}
+  .tag{display:inline-block;padding:4px 10px;border-radius:999px;
+    background:#12263b;color:#8ec6f0;font-size:12px;margin-bottom:12px}
+  .panel h3{margin:0 0 12px;font-size:17px}
+  .panel p{margin:9px 0;font-size:13.5px;line-height:1.68;color:#b3c3d6}
+  .panel b{color:#ffd166;font-weight:600}
+  .focus{margin:14px 0 6px;padding:13px 14px;border-radius:11px;
+    background:#0d2033;border:1px solid #23405c}
+  .focus .fn{font-size:19px;font-weight:700;color:#ffd166}
+  .focus .fl{margin-top:6px;font-size:13px;color:#9fc4e8;font-family:ui-monospace,Consolas,monospace}
+  .focus .fh{margin-top:6px;font-size:12px;color:#7f93ab}
+  .list{margin-top:12px;max-height:212px;overflow:auto}
+  .row{display:flex;justify-content:space-between;gap:10px;padding:5px 2px;
+    font-size:12.5px;color:#93a9c4;border-bottom:1px dashed #1b2d42}
+  .row.act{color:#ffd166;font-weight:600}
+  .row span:last-child{font-family:ui-monospace,Consolas,monospace;color:#7f93ab}
+  .row.act span:last-child{color:#c9a44a}
+  .btns{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+  .btn{border:1px solid #2d4a68;background:#102137;color:#dbe8f7;border-radius:9px;
+    padding:8px 13px;cursor:pointer;font-size:13px;font-family:inherit}
+  .btn:hover{background:#18304b;border-color:#3d7fb5}
+  .btn.on{background:#1d4a72;border-color:#4d9ad6;color:#eaf6ff}
+  .nav{position:fixed;left:36px;bottom:26px;z-index:3;display:flex;gap:18px}
+  .nav a{color:#9dc6ee;text-decoration:none;font-size:13.5px;padding:7px 13px;
+    border:1px solid #1f3550;border-radius:9px;background:rgba(8,19,32,.8)}
+  .nav a:hover{background:#14293f;border-color:#3d7fb5}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="hud">
+  <div class="t">earth03 · 城市标注</div>
+  <div class="s">拖拽旋转 · 滚轮缩放 —— 背面城市会自动隐藏</div>
+</div>
+
+<div class="panel">
+  <span class="tag">第 3 节 / 共 6 节</span>
+  <h3>城市位置与经纬度</h3>
+  <p>每一座城市都可以用一组<b>经纬度</b>唯一确定。地球自转时，城市随球面一起移动；转到<b>背面</b>的城市会被地球挡住，自动隐藏。</p>
+  <div class="focus">
+    <div class="fn" id="fName">—</div>
+    <div class="fl" id="fLatLon">—</div>
+    <div class="fh">正对观察者的城市</div>
+  </div>
+  <div class="list" id="list"></div>
+  <div class="btns">
+    <button class="btn on" id="bAuto">自转：开</button>
+    <button class="btn on" id="bLL">显示经纬度</button>
+    <button class="btn" id="bReset">重置视角</button>
+  </div>
+</div>
+
+<div class="nav">
+  <a href="earth02.html">← 上一节：经纬网</a>
+  <a href="index.html">返回导航</a>
+  <a href="earth04.html">下一节：交互特效 →</a>
+</div>
+
+<script>
+const DEG = Math.PI/180;
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+/* ---------------------- 主要城市（经纬度 + IANA 时区） ---------------------- */
+const CITIES = [
+  {name:'北京', lat: 39.9042, lon: 116.4074, tz:'Asia/Shanghai'},
+  {name:'东京', lat: 35.6762, lon: 139.6503, tz:'Asia/Tokyo'},
+  {name:'新德里', lat: 28.6139, lon:  77.2090, tz:'Asia/Kolkata'},
+  {name:'莫斯科', lat: 55.7558, lon:  37.6173, tz:'Europe/Moscow'},
+  {name:'伦敦', lat: 51.5074, lon:  -0.1278, tz:'Europe/London'},
+  {name:'开罗', lat: 30.0444, lon:  31.2357, tz:'Africa/Cairo'},
+  {name:'纽约', lat: 40.7128, lon: -74.0060, tz:'America/New_York'},
+  {name:'悉尼', lat:-33.8688, lon: 151.2093, tz:'Australia/Sydney'}
+];
+
+let W=0, H=0, DPR=1, R=320;
+let rotY = -0.35, rotX = -0.28, zoom = 1, spin = 0;
+let auto = true, showLL = true;
+let dragging = false, lastX = 0, lastY = 0;
+
+function layout(){
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  canvas.width = Math.round(W*DPR);
+  canvas.height = Math.round(H*DPR);
+  canvas.style.width = W+'px';
+  canvas.style.height = H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  R = Math.min(W*0.30, H*0.42) * zoom;
+  buildStars();
+}
+function CX(){ return W/2 - Math.min(178, W*0.095); }
+function CY(){ return H/2; }
+
+function toView(lat, lon, r){
+  if(r === undefined) r = 1;
+  const a  = (lon + spin)*DEG + rotY;
+  const la = lat*DEG, cl = Math.cos(la);
+  const x = r*cl*Math.cos(a);
+  const y = r*Math.sin(la);
+  const z = r*cl*Math.sin(a);
+  const c = Math.cos(rotX), s = Math.sin(rotX);
+  return [x, y*c - z*s, y*s + z*c];
+}
+function PX(v){ return CX() + v[0]*R; }
+function PY(v){ return CY() - v[1]*R; }
+
+/* --------------------------- 背景星空 --------------------------- */
+let stars = [];
+function buildStars(){
+  let seed = 987654321;
+  const rnd = () => (seed = (seed*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  stars = [];
+  const n = Math.round(W*H/3200);
+  for(let i=0;i<n;i++) stars.push(rnd()*W, rnd()*H, rnd()*1.4+.3, rnd()*.5+.12);
+}
+function drawBG(){
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#03080f'); g.addColorStop(1,'#07131f');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  for(let i=0;i<stars.length;i+=4){
+    ctx.fillStyle = 'rgba(226,240,255,'+stars[i+3].toFixed(3)+')';
+    ctx.fillRect(stars[i], stars[i+1], stars[i+2], stars[i+2]);
+  }
+}
+
+function drawGlobe(){
+  const cx = CX(), cy = CY();
+  const g = ctx.createRadialGradient(cx-R*0.36, cy-R*0.40, R*0.06, cx, cy, R*1.08);
+  g.addColorStop(0,'#3f8fc4'); g.addColorStop(0.42,'#1f5f8e');
+  g.addColorStop(0.78,'#123f60'); g.addColorStop(1,'#08202f');
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.fillStyle = g; ctx.fill();
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.clip();
+  const rim = ctx.createRadialGradient(cx,cy,R*0.80,cx,cy,R);
+  rim.addColorStop(0,'rgba(150,215,255,0)');
+  rim.addColorStop(1,'rgba(150,215,255,.30)');
+  ctx.fillStyle = rim; ctx.fillRect(cx-R,cy-R,R*2,R*2);
+  ctx.restore();
+}
+
+function strokeCurve(pts, color, width){
+  ctx.save();
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  let started=false, prev=null;
+  for(let i=0;i<pts.length;i++){
+    const v = toView(pts[i][0], pts[i][1]);
+    if(v[2] >= 0){
+      const x=PX(v), y=PY(v);
+      if(started) ctx.lineTo(x,y); else { ctx.moveTo(x,y); started=true; }
+      prev = v;
+    }else{
+      if(started && prev){
+        const t = prev[2]/(prev[2]-v[2]);
+        ctx.lineTo(CX()+(prev[0]+(v[0]-prev[0])*t)*R, CY()-(prev[1]+(v[1]-prev[1])*t)*R);
+      }
+      started=false; prev=null;
+    }
+  }
+  ctx.stroke(); ctx.restore();
+}
+function parallel(lat){ const p=[]; for(let lon=-180;lon<=180;lon+=4) p.push([lat,lon]); return p; }
+function meridian(lon){ const p=[]; for(let lat=-90;lat<=90;lat+=4) p.push([lat,lon]); return p; }
+
+function drawGrid(){
+  for(let lat=-60; lat<=60; lat+=30){
+    if(lat===0) continue;
+    strokeCurve(parallel(lat), 'rgba(153,194,226,.26)', 1);
+  }
+  for(let lon=-180; lon<180; lon+=30){
+    if(lon===0) continue;
+    strokeCurve(meridian(lon), 'rgba(153,194,226,.26)', 1);
+  }
+  strokeCurve(parallel(0), 'rgba(255,209,102,.75)', 1.8);   // 赤道
+  strokeCurve(meridian(0), 'rgba(95,216,255,.60)', 1.5);    // 本初子午线
+}
+
+/* --------------------- 城市标注：背面自动隐藏 --------------------- */
+let front = [];      // 本帧位于正面的城市
+let focusCity = null;
+
+function drawCities(){
+  front = [];
+  for(const c of CITIES){
+    const v = toView(c.lat, c.lon);
+    if(v[2] > 0.02) front.push({c, v, z:v[2]});
+  }
+  front.sort((a,b) => a.z - b.z);          // 远的先画
+
+  // 正对观察者的城市 = z 最大
+  focusCity = front.length ? front[front.length-1].c : null;
+
+  for(const f of front){
+    const x = PX(f.v), y = PY(f.v);
+    const isFocus = focusCity && f.c === focusCity;
+    const rad = 3.4 + f.z*2.4;             // 越正对越大，形成纵深
+
+    if(isFocus){
+      ctx.beginPath(); ctx.arc(x,y,rad+7,0,Math.PI*2);
+      ctx.strokeStyle = 'rgba(255,209,102,.85)'; ctx.lineWidth = 1.6; ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(x,y,rad,0,Math.PI*2);
+    ctx.fillStyle = isFocus ? '#ffd166' : '#ffcf66';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(6,17,29,.85)'; ctx.lineWidth = 1.2; ctx.stroke();
+
+    ctx.fillStyle = isFocus ? '#ffe9a8' : '#eef5ff';
+    ctx.font = (isFocus ? 'bold 14px ' : '13px ') + 'system-ui';
+    ctx.fillText(f.c.name, x + rad + 6, y - rad - 4);
+
+    if(showLL){
+      ctx.fillStyle = 'rgba(150,190,225,.9)';
+      ctx.font = '11px ui-monospace, Consolas, monospace';
+      ctx.fillText(fmtLL(f.c.lat, 'N', 'S') + '  ' + fmtLL(f.c.lon, 'E', 'W'),
+                   x + rad + 6, y - rad + 9);
+    }
+  }
+}
+function fmtLL(v, pos, neg){
+  return Math.abs(v).toFixed(2) + '°' + (v >= 0 ? pos : neg);
+}
+
+function drawLabels(){
+  const v1 = toView(0, 62);
+  if(v1[2] > 0){ ctx.fillStyle='rgba(255,209,102,.95)'; ctx.font='bold 14px system-ui';
+    ctx.fillText('赤道 0°', PX(v1)+8, PY(v1)-8); }
+  const v2 = toView(66, 0);
+  if(v2[2] > 0){ ctx.fillStyle='rgba(95,216,255,.95)'; ctx.font='bold 14px system-ui';
+    ctx.fillText('本初子午线 0°', PX(v2)+9, PY(v2)+4); }
+}
+
+/* --------------------------- 侧栏 --------------------------- */
+const elName = document.getElementById('fName');
+const elLatLon = document.getElementById('fLatLon');
+const elList = document.getElementById('list');
+elList.innerHTML = CITIES.map((c,i) =>
+  '<div class="row" data-i="'+i+'"><span>'+c.name+'</span><span>'+
+  fmtLL(c.lat,'N','S')+' '+fmtLL(c.lon,'E','W')+'</span></div>').join('');
+const rows = elList.querySelectorAll('.row');
+
+let lastFocus = null;
+function syncPanel(){
+  if(focusCity && focusCity !== lastFocus){
+    lastFocus = focusCity;
+    elName.textContent = focusCity.name;
+    elLatLon.textContent = fmtLL(focusCity.lat,'N','S') + '  ' + fmtLL(focusCity.lon,'E','W');
+    rows.forEach(r => {
+      r.classList.toggle('act', CITIES[+r.dataset.i] === focusCity);
+    });
+  }
+}
+
+/* --------------------------- 主循环 --------------------------- */
+function frame(){
+  if(auto && !dragging){
+    spin -= 0.0028;             // 自西向东：视觉上球面向右移动
+    if(spin < -Math.PI*2) spin += Math.PI*2;
+  }
+  ctx.clearRect(0,0,W,H);
+  drawBG();
+  drawGlobe();
+  drawGrid();
+  drawCities();
+  drawLabels();
+  syncPanel();
+  requestAnimationFrame(frame);
+}
+
+/* --------------------------- 交互 --------------------------- */
+canvas.addEventListener('pointerdown', e => {
+  dragging = true; lastX = e.clientX; lastY = e.clientY;
+  canvas.setPointerCapture(e.pointerId); canvas.style.cursor = 'grabbing';
+});
+canvas.addEventListener('pointermove', e => {
+  if(!dragging) return;
+  rotY += (e.clientX - lastX)*0.0085;
+  rotX += (e.clientY - lastY)*0.0062;
+  rotX = Math.max(-1.25, Math.min(1.25, rotX));
+  lastX = e.clientX; lastY = e.clientY;
+});
+canvas.addEventListener('pointerup', e => {
+  dragging = false; canvas.style.cursor = 'grab';
+  try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  zoom = Math.max(0.65, Math.min(1.7, zoom * (e.deltaY<0?1.08:0.93)));
+  layout();
+}, {passive:false});
+canvas.style.cursor = 'grab';
+
+const bAuto = document.getElementById('bAuto');
+bAuto.onclick = () => { auto = !auto;
+  bAuto.textContent = '自转：' + (auto?'开':'关'); bAuto.classList.toggle('on', auto); };
+const bLL = document.getElementById('bLL');
+bLL.onclick = () => { showLL = !showLL; bLL.classList.toggle('on', showLL); };
+document.getElementById('bReset').onclick = () => {
+  rotY = -0.35; rotX = -0.28; zoom = 1; spin = 0; layout();
+};
+
+addEventListener('resize', layout);
+layout();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

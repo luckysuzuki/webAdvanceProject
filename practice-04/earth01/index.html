@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3D地球可视化课堂 · 导航</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:#040a14;
+    font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:#eaf2ff}
+
+  /* 1920×1080 设计画布，按视口等比缩放 */
+  #stage{position:fixed;left:50%;top:50%;width:1920px;height:1080px;
+    transform-origin:center center;will-change:transform}
+  #stars{position:absolute;inset:0;width:1920px;height:1080px}
+
+  .inner{position:relative;padding:78px 120px 0}
+
+  header{display:flex;align-items:flex-end;justify-content:space-between;gap:40px}
+  h1{margin:0;font-size:64px;letter-spacing:2px;font-weight:800;
+    background:linear-gradient(92deg,#eaf6ff 10%,#7ec8ff 55%,#ffd166 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{margin:14px 0 0;font-size:21px;color:#93a9c4;letter-spacing:.5px}
+  .badge{flex:none;border:1px solid #2b4a6b;background:rgba(14,32,52,.72);
+    border-radius:999px;padding:13px 24px;font-size:17px;color:#8fd8a8;white-space:nowrap}
+  .badge b{color:#c9ffe0;font-weight:600}
+  .badge .dot{display:inline-block;width:9px;height:9px;border-radius:50%;
+    background:#4ade80;box-shadow:0 0 10px #4ade80;margin-right:10px;vertical-align:middle}
+
+  .grid{margin-top:58px;display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
+  .card{position:relative;display:block;border:1px solid #1f3550;
+    border-radius:18px;padding:28px 26px 24px;text-decoration:none;color:inherit;
+    background:linear-gradient(160deg,rgba(16,36,58,.92),rgba(9,20,34,.92));
+    transition:transform .16s ease,border-color .16s ease,background .16s ease}
+  .card:hover{transform:translateY(-5px);border-color:#3d7fb5;
+    background:linear-gradient(160deg,rgba(23,52,82,.96),rgba(11,26,44,.96))}
+  .card .no{font-size:15px;font-weight:700;letter-spacing:3px;color:#5fa8e0}
+  .card .nm{margin:12px 0 10px;font-size:29px;font-weight:700}
+  .card .ds{font-size:16px;line-height:1.6;color:#9fb2c9;min-height:76px}
+  .card .kp{margin-top:14px;padding-top:14px;border-top:1px dashed #24405e;
+    font-size:14px;line-height:1.65;color:#7f93ab}
+  .card .kp b{color:#b9cde4;font-weight:600}
+  .card .go{position:absolute;right:24px;top:26px;font-size:22px;color:#3d7fb5;
+    transition:transform .16s ease,color .16s ease}
+  .card:hover .go{transform:translateX(5px);color:#7ec8ff}
+
+  footer{position:absolute;left:120px;right:120px;bottom:52px;display:flex;
+    justify-content:space-between;align-items:center;font-size:15px;color:#5d7391}
+  footer code{background:#0e1e30;border:1px solid #1f3550;border-radius:6px;
+    padding:3px 9px;color:#9fc4e8;font-family:ui-monospace,Consolas,monospace;font-size:14px}
+</style>
+</head>
+<body>
+<canvas id="stars" width="1920" height="1080"></canvas>
+<div id="stage">
+  <div class="inner">
+    <header>
+      <div>
+        <h1>3D 地球可视化课堂</h1>
+        <p class="sub">初中地理 · 地球形状 / 经纬网 / 自转 / 时区 / 昼夜交替 —— 六节递进式演示</p>
+      </div>
+      <div class="badge"><span class="dot"></span>纯离线运行 · <b>无需联网</b></div>
+    </header>
+
+    <div class="grid">
+      <a class="card" href="earth01.html">
+        <span class="go">→</span><div class="no">EARTH 01</div>
+        <div class="nm">基础球体</div>
+        <div class="ds">用球体轮廓与光影建立最基础的空间感，可拖拽旋转、滚轮缩放。</div>
+        <div class="kp"><b>知识点</b>：地球是一个球体</div>
+      </a>
+      <a class="card" href="earth02.html">
+        <span class="go">→</span><div class="no">EARTH 02</div>
+        <div class="nm">经纬网</div>
+        <div class="ds">静止视角正对本初子午线，高亮赤道与 0° 经线，观察经纬线的空间走向。</div>
+        <div class="kp"><b>知识点</b>：经线、纬线、赤道、本初子午线</div>
+      </a>
+      <a class="card" href="earth03.html">
+        <span class="go">→</span><div class="no">EARTH 03</div>
+        <div class="nm">城市标注</div>
+        <div class="ds">自转的地球上点亮主要城市，背面城市自动隐藏，读出每个城市的经纬度。</div>
+        <div class="kp"><b>知识点</b>：城市位置与经纬度的关系</div>
+      </a>
+      <a class="card" href="earth04.html">
+        <span class="go">→</span><div class="no">EARTH 04</div>
+        <div class="nm">交互特效</div>
+        <div class="ds">点选两座城市自动生成大圆弧跳线，读出球面最短距离，并加入卫星轨道。</div>
+        <div class="kp"><b>知识点</b>：球面两点最短距离（大圆弧）与卫星轨道</div>
+      </a>
+      <a class="card" href="earth05.html">
+        <span class="go">→</span><div class="no">EARTH 05</div>
+        <div class="nm">海岸线与世界时间</div>
+        <div class="ds">用真实海岸线数据勾出七大洲轮廓，并排显示 5 座城市的实时地方时。</div>
+        <div class="kp"><b>知识点</b>：大洲轮廓、时区、地方时与昼夜区别</div>
+      </a>
+      <a class="card" href="earth06.html">
+        <span class="go">→</span><div class="no">EARTH 06</div>
+        <div class="nm">昼夜地球</div>
+        <div class="ds">地轴倾斜 23.4°，用真实晨昏线切开昼半球与夜半球，可切换二分二至。</div>
+        <div class="kp"><b>知识点</b>：昼夜交替、黄赤交角、地轴倾斜</div>
+      </a>
+    </div>
+  </div>
+
+  <footer>
+    <span>六节为递进关系：每一节都完整保留上一节的能力，再叠加新内容。</span>
+    <span>全部数据内联 · 双击 <code>index.html</code> 即可离线演示</span>
+  </footer>
+</div>
+
+<script>
+/* ---------- 背景星空（程序化生成，不依赖任何图片） ---------- */
+(function stars(){
+  const cv = document.getElementById('stars'), g = cv.getContext('2d');
+  g.fillStyle = '#040a14'; g.fillRect(0,0,1920,1080);
+  const bg = g.createRadialGradient(1340,300,0,1340,300,1250);
+  bg.addColorStop(0,'rgba(30,74,124,.42)');
+  bg.addColorStop(.55,'rgba(12,32,58,.18)');
+  bg.addColorStop(1,'rgba(4,10,20,0)');
+  g.fillStyle = bg; g.fillRect(0,0,1920,1080);
+  // 固定种子，保证每次打开星图一致
+  let seed = 20240921;
+  const rnd = () => (seed = (seed*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  for(let i=0;i<620;i++){
+    const x = rnd()*1920, y = rnd()*1080, r = rnd()*1.5+.25, a = rnd()*.55+.15;
+    g.fillStyle = 'rgba(226,240,255,'+a.toFixed(3)+')';
+    g.beginPath(); g.arc(x,y,r,0,Math.PI*2); g.fill();
+  }
+})();
+
+/* ---------- 1920×1080 画布等比自适应缩放 ---------- */
+(function fit(){
+  const stage = document.getElementById('stage');
+  const resize = () => {
+    const s = Math.min(innerWidth/1920, innerHeight/1080);
+    stage.style.transform = 'translate(-50%,-50%) scale('+s+')';
+    document.body.style.background = '#040a14';
+  };
+  addEventListener('resize', resize);
+  resize();
+})();
+</script>
+</body>
+</html>

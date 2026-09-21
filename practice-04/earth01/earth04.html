@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>earth04 · 交互特效</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#040a14;color:#eaf2ff;
+    font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  #c{display:block;width:100%;height:100%}
+  .hud{position:fixed;left:36px;top:32px;z-index:2;pointer-events:none}
+  .hud .t{font-size:28px;font-weight:800;letter-spacing:.5px}
+  .hud .s{margin-top:8px;font-size:14px;color:#8ea4bf}
+  .panel{position:fixed;right:26px;top:26px;width:336px;z-index:3;
+    border:1px solid #1f3550;border-radius:16px;padding:20px;background:rgba(8,19,32,.9)}
+  .tag{display:inline-block;padding:4px 10px;border-radius:999px;
+    background:#12263b;color:#8ec6f0;font-size:12px;margin-bottom:12px}
+  .panel h3{margin:0 0 12px;font-size:17px}
+  .panel p{margin:9px 0;font-size:13.5px;line-height:1.68;color:#b3c3d6}
+  .panel b{color:#ffd166;font-weight:600}
+  .route{margin:14px 0 6px;padding:14px;border-radius:11px;
+    background:#0d2033;border:1px solid #23405c;min-height:104px}
+  .route .rg{font-size:17px;font-weight:700;color:#7ec8ff;line-height:1.5}
+  .route .rd{margin-top:8px;font-size:23px;font-weight:800;color:#ffd166;
+    font-family:ui-monospace,Consolas,monospace}
+  .route .rh{margin-top:7px;font-size:12px;color:#7f93ab;line-height:1.55}
+  .btns{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+  .btn{border:1px solid #2d4a68;background:#102137;color:#dbe8f7;border-radius:9px;
+    padding:8px 13px;cursor:pointer;font-size:13px;font-family:inherit}
+  .btn:hover{background:#18304b;border-color:#3d7fb5}
+  .btn.on{background:#1d4a72;border-color:#4d9ad6;color:#eaf6ff}
+  .nav{position:fixed;left:36px;bottom:26px;z-index:3;display:flex;gap:18px}
+  .nav a{color:#9dc6ee;text-decoration:none;font-size:13.5px;padding:7px 13px;
+    border:1px solid #1f3550;border-radius:9px;background:rgba(8,19,32,.8)}
+  .nav a:hover{background:#14293f;border-color:#3d7fb5}
+  .hint{position:fixed;left:36px;bottom:92px;z-index:3;font-size:13px;color:#7f93ab;
+    border:1px dashed #24384f;border-radius:10px;padding:9px 14px;
+    background:rgba(8,19,32,.7);max-width:360px;line-height:1.6}
+  .hint b{color:#7ec8ff}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="hud">
+  <div class="t">earth04 · 交互特效</div>
+  <div class="s">点击两座城市 → 自动生成球面最短航线（大圆弧）</div>
+</div>
+
+<div class="panel">
+  <span class="tag">第 4 节 / 共 6 节</span>
+  <h3>大圆弧与卫星轨道</h3>
+  <p>球面上两点之间的<b>最短路线</b>，是过这两点与地心所确定的大圆上的那段劣弧，叫做<b>大圆航线</b>。飞机和轮船都尽量沿它航行。</p>
+  <div class="route">
+    <div class="rg" id="rName">—</div>
+    <div class="rd" id="rDist">—</div>
+    <div class="rh" id="rHint">点击球面上的城市来设置航线</div>
+  </div>
+  <div class="btns">
+    <button class="btn" id="bClear">清空跳线</button>
+    <button class="btn on" id="bSat">卫星：开</button>
+    <button class="btn on" id="bAuto">自转：开</button>
+  </div>
+</div>
+
+<div class="hint">
+  <b>操作</b>：拖拽旋转 · 滚轮缩放 · 单击城市添加/移除跳线（最多两座）
+</div>
+
+<div class="nav">
+  <a href="earth03.html">← 上一节：城市标注</a>
+  <a href="index.html">返回导航</a>
+  <a href="earth05.html">下一节：海岸线与世界时间 →</a>
+</div>
+
+<script>
+const DEG = Math.PI/180;
+const EARTH_R = 6371;              // 地球平均半径（km）
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+const CITIES = [
+  {name:'北京', lat: 39.9042, lon: 116.4074, tz:'Asia/Shanghai'},
+  {name:'东京', lat: 35.6762, lon: 139.6503, tz:'Asia/Tokyo'},
+  {name:'新德里', lat: 28.6139, lon:  77.2090, tz:'Asia/Kolkata'},
+  {name:'莫斯科', lat: 55.7558, lon:  37.6173, tz:'Europe/Moscow'},
+  {name:'伦敦', lat: 51.5074, lon:  -0.1278, tz:'Europe/London'},
+  {name:'开罗', lat: 30.0444, lon:  31.2357, tz:'Africa/Cairo'},
+  {name:'纽约', lat: 40.7128, lon: -74.0060, tz:'America/New_York'},
+  {name:'悉尼', lat:-33.8688, lon: 151.2093, tz:'Australia/Sydney'}
+];
+
+let W=0, H=0, DPR=1, R=320;
+let rotY = -0.95, rotX = -0.30, zoom = 1, spin = 0;
+let auto = true, satOn = true;
+let dragging = false, lastX = 0, lastY = 0, moved = 0;
+let hoverCity = null;
+let selected = [];                 // 已选城市（最多 2 个）
+let satPhase = 0;
+
+function layout(){
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  canvas.width = Math.round(W*DPR);
+  canvas.height = Math.round(H*DPR);
+  canvas.style.width = W+'px';
+  canvas.style.height = H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  R = Math.min(W*0.30, H*0.42) * zoom;
+  buildStars();
+}
+function CX(){ return W/2 - Math.min(178, W*0.095); }
+function CY(){ return H/2; }
+
+/* -------- 三维核心：地球固定坐标系 (X→0°N0°E, Y→北极, Z→0°N90°E) -------- */
+function ef(lat, lon, r){
+  if(r === undefined) r = 1;
+  const la = lat*DEG, lo = lon*DEG, cl = Math.cos(la);
+  return [r*cl*Math.cos(lo), r*Math.sin(la), r*cl*Math.sin(lo)];
+}
+/* theta 为视角绕地轴的偏航角；地球上的点要叠加自转 spin，卫星不叠加 */
+function viewOf(p, theta){
+  const ct = Math.cos(theta), st = Math.sin(theta);
+  const x =  p[0]*ct - p[2]*st;
+  const z =  p[2]*ct + p[0]*st;
+  const y =  p[1];
+  const c = Math.cos(rotX), s = Math.sin(rotX);
+  return [x, y*c - z*s, y*s + z*c];
+}
+function toView(lat, lon, r){ return viewOf(ef(lat,lon,r), spin*DEG + rotY); }
+function PX(v){ return CX() + v[0]*R; }
+function PY(v){ return CY() - v[1]*R; }
+
+/* --------------------------- 背景星空 --------------------------- */
+let stars = [];
+function buildStars(){
+  let seed = 987654321;
+  const rnd = () => (seed = (seed*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  stars = [];
+  const n = Math.round(W*H/3200);
+  for(let i=0;i<n;i++) stars.push(rnd()*W, rnd()*H, rnd()*1.4+.3, rnd()*.5+.12);
+}
+function drawBG(){
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#03080f'); g.addColorStop(1,'#07131f');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  for(let i=0;i<stars.length;i+=4){
+    ctx.fillStyle = 'rgba(226,240,255,'+stars[i+3].toFixed(3)+')';
+    ctx.fillRect(stars[i], stars[i+1], stars[i+2], stars[i+2]);
+  }
+}
+
+function drawGlobe(){
+  const cx = CX(), cy = CY();
+  const g = ctx.createRadialGradient(cx-R*0.36, cy-R*0.40, R*0.06, cx, cy, R*1.08);
+  g.addColorStop(0,'#3f8fc4'); g.addColorStop(0.42,'#1f5f8e');
+  g.addColorStop(0.78,'#123f60'); g.addColorStop(1,'#08202f');
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.fillStyle = g; ctx.fill();
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.clip();
+  const rim = ctx.createRadialGradient(cx,cy,R*0.80,cx,cy,R);
+  rim.addColorStop(0,'rgba(150,215,255,0)');
+  rim.addColorStop(1,'rgba(150,215,255,.30)');
+  ctx.fillStyle = rim; ctx.fillRect(cx-R,cy-R,R*2,R*2);
+  ctx.restore();
+}
+
+function strokeCurve(pts, color, width){
+  ctx.save();
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  let started=false, prev=null;
+  for(let i=0;i<pts.length;i++){
+    const v = toView(pts[i][0], pts[i][1]);
+    if(v[2] >= 0){
+      const x=PX(v), y=PY(v);
+      if(started) ctx.lineTo(x,y); else { ctx.moveTo(x,y); started=true; }
+      prev = v;
+    }else{
+      if(started && prev){
+        const t = prev[2]/(prev[2]-v[2]);
+        ctx.lineTo(CX()+(prev[0]+(v[0]-prev[0])*t)*R, CY()-(prev[1]+(v[1]-prev[1])*t)*R);
+      }
+      started=false; prev=null;
+    }
+  }
+  ctx.stroke(); ctx.restore();
+}
+function parallel(lat){ const p=[]; for(let lon=-180;lon<=180;lon+=4) p.push([lat,lon]); return p; }
+function meridian(lon){ const p=[]; for(let lat=-90;lat<=90;lat+=4) p.push([lat,lon]); return p; }
+
+function drawGrid(){
+  for(let lat=-60; lat<=60; lat+=30){
+    if(lat===0) continue;
+    strokeCurve(parallel(lat), 'rgba(153,194,226,.22)', 1);
+  }
+  for(let lon=-180; lon<180; lon+=30){
+    if(lon===0) continue;
+    strokeCurve(meridian(lon), 'rgba(153,194,226,.22)', 1);
+  }
+  strokeCurve(parallel(0), 'rgba(255,209,102,.55)', 1.5);
+  strokeCurve(meridian(0), 'rgba(95,216,255,.45)', 1.3);
+}
+
+/* --------------------- 大圆（球面最短航线） --------------------- */
+function slerp(a, b, t){
+  let d = a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+  d = Math.max(-1, Math.min(1, d));
+  const o = Math.acos(d);
+  if(o < 1e-9) return [a[0], a[1], a[2]];
+  const so = Math.sin(o);
+  const k1 = Math.sin((1-t)*o)/so, k2 = Math.sin(t*o)/so;
+  return [a[0]*k1 + b[0]*k2, a[1]*k1 + b[1]*k2, a[2]*k1 + b[2]*k2];
+}
+function greatCircleKm(a, b){
+  const A = ef(a.lat, a.lon), B = ef(b.lat, b.lon);
+  let d = A[0]*B[0] + A[1]*B[1] + A[2]*B[2];
+  d = Math.max(-1, Math.min(1, d));
+  return Math.acos(d) * EARTH_R;
+}
+function drawGreatCircle(a, b, alpha){
+  const A = ef(a.lat, a.lon), B = ef(b.lat, b.lon);
+  const N = 160;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,197,88,'+alpha+')';
+  ctx.lineWidth = 2.6;
+  ctx.lineCap = 'round';
+  ctx.shadowColor = 'rgba(255,197,88,.55)';
+  ctx.shadowBlur = 9;
+  ctx.beginPath();
+  let started=false, prev=null;
+  for(let i=0;i<=N;i++){
+    const v = viewOf(slerp(A,B,i/N), spin*DEG + rotY);
+    if(v[2] >= 0){
+      const x=PX(v), y=PY(v);
+      if(started) ctx.lineTo(x,y); else { ctx.moveTo(x,y); started=true; }
+      prev = v;
+    }else{
+      if(started && prev){
+        const t = prev[2]/(prev[2]-v[2]);
+        ctx.lineTo(CX()+(prev[0]+(v[0]-prev[0])*t)*R, CY()-(prev[1]+(v[1]-prev[1])*t)*R);
+      }
+      started=false; prev=null;
+    }
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* --------------------------- 城市 --------------------------- */
+function drawCities(){
+  const list = [];
+  for(const c of CITIES){
+    const v = toView(c.lat, c.lon);
+    if(v[2] > 0.02) list.push({c, v, z:v[2]});
+  }
+  list.sort((a,b) => a.z - b.z);
+
+  for(const f of list){
+    const x = PX(f.v), y = PY(f.v);
+    const sel = selected.indexOf(f.c) >= 0;
+    const hov = hoverCity === f.c;
+    const rad = 3.4 + f.z*2.4;
+
+    if(sel){
+      ctx.beginPath(); ctx.arc(x,y,rad+8,0,Math.PI*2);
+      ctx.strokeStyle = 'rgba(255,209,102,.95)'; ctx.lineWidth = 2; ctx.stroke();
+    }else if(hov){
+      ctx.beginPath(); ctx.arc(x,y,rad+6,0,Math.PI*2);
+      ctx.strokeStyle = 'rgba(126,200,255,.8)'; ctx.lineWidth = 1.6; ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(x,y,rad,0,Math.PI*2);
+    ctx.fillStyle = sel ? '#ffd166' : (hov ? '#9fd8ff' : '#ffcf66');
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(6,17,29,.85)'; ctx.lineWidth = 1.2; ctx.stroke();
+
+    ctx.fillStyle = sel ? '#ffe9a8' : '#eef5ff';
+    ctx.font = (sel ? 'bold 14px ' : '13px ') + 'system-ui';
+    ctx.fillText(f.c.name, x + rad + 6, y - rad - 4);
+  }
+  return list;
+}
+
+/* --------------------------- 卫星 --------------------------- */
+const SAT_R = 1.24;
+const SAT_INC = 52*DEG;
+function satBasis(){
+  // 轨道面法线 n 与地轴成 (90° - 倾角)
+  const n = [Math.sin(SAT_INC), Math.cos(SAT_INC), 0];
+  const u = [-Math.cos(SAT_INC), Math.sin(SAT_INC), 0];   // ⊥ n
+  const v = [0, 0, 1];                                     // ⊥ n
+  return [u, v];
+}
+function drawSatellite(){
+  const [u, v] = satBasis();
+  const th = rotY;                       // 卫星不随地球自转
+  const at = phi => viewOf([
+    SAT_R*(Math.cos(phi)*u[0] + Math.sin(phi)*v[0]),
+    SAT_R*(Math.cos(phi)*u[1] + Math.sin(phi)*v[1]),
+    SAT_R*(Math.cos(phi)*u[2] + Math.sin(phi)*v[2])
+  ], th);
+
+  // 轨道：分前后两段画，背面变暗
+  for(const front of [false, true]){
+    ctx.beginPath();
+    let pen = false;
+    for(let i=0;i<=180;i++){
+      const p = at(i/180*Math.PI*2);
+      const isFront = p[2] > 0;
+      if(isFront === front){
+        const x=PX(p), y=PY(p);
+        if(pen) ctx.lineTo(x,y); else { ctx.moveTo(x,y); pen = true; }
+      }else pen = false;
+    }
+    ctx.strokeStyle = front ? 'rgba(126,220,255,.85)' : 'rgba(126,220,255,.20)';
+    ctx.lineWidth = front ? 1.5 : 1;
+    ctx.stroke();
+  }
+
+  // 卫星本体
+  const p = at(satPhase);
+  const x = PX(p), y = PY(p);
+  const front = p[2] > 0;
+  ctx.save();
+  ctx.globalAlpha = front ? 1 : 0.42;
+  ctx.beginPath(); ctx.arc(x,y,9,0,Math.PI*2);
+  ctx.fillStyle = 'rgba(126,220,255,.20)'; ctx.fill();
+  ctx.beginPath(); ctx.arc(x,y,4.2,0,Math.PI*2);
+  ctx.fillStyle = '#cdefff'; ctx.fill();
+  ctx.strokeStyle = '#7edcff'; ctx.lineWidth = 1.6; ctx.stroke();
+  ctx.fillStyle = 'rgba(190,235,255,.95)'; ctx.font = '12px system-ui';
+  ctx.fillText('卫星', x + 12, y + 4);
+  ctx.restore();
+
+  satPhase += 0.012;
+  if(satPhase > Math.PI*2) satPhase -= Math.PI*2;
+}
+
+/* --------------------------- 命中检测 --------------------------- */
+function pickCity(mx, my){
+  let best = null, bd = 26*26;
+  for(const c of CITIES){
+    const v = toView(c.lat, c.lon);
+    if(v[2] <= 0) continue;
+    const dx = PX(v) - mx, dy = PY(v) - my;
+    const d = dx*dx + dy*dy;
+    if(d < bd){ bd = d; best = c; }
+  }
+  return best;
+}
+
+/* --------------------------- 侧栏 --------------------------- */
+const rName = document.getElementById('rName');
+const rDist = document.getElementById('rDist');
+const rHint = document.getElementById('rHint');
+function syncPanel(){
+  if(selected.length === 2){
+    const km = greatCircleKm(selected[0], selected[1]);
+    rName.textContent = selected[0].name + '  →  ' + selected[1].name;
+    rDist.textContent = Math.round(km).toLocaleString('en-US') + ' km';
+    rHint.textContent = '沿大圆弧量得的球面最短距离（地球半径按 6371 km 计算）';
+  }else if(selected.length === 1){
+    rName.textContent = selected[0].name + '  →  ?';
+    rDist.textContent = '—';
+    rHint.textContent = '再点一座城市，生成大圆航线';
+  }else{
+    rName.textContent = '—';
+    rDist.textContent = '—';
+    rHint.textContent = '点击球面上的城市来设置航线';
+  }
+}
+
+/* --------------------------- 主循环 --------------------------- */
+function frame(){
+  if(auto && !dragging){
+    spin -= 0.0026;
+    if(spin < -Math.PI*2) spin += Math.PI*2;
+  }
+  ctx.clearRect(0,0,W,H);
+  drawBG();
+  drawGlobe();
+  drawGrid();
+  if(selected.length === 2) drawGreatCircle(selected[0], selected[1], 0.92);
+  if(satOn) drawSatellite();
+  drawCities();
+  requestAnimationFrame(frame);
+}
+
+/* --------------------------- 交互 --------------------------- */
+canvas.addEventListener('pointerdown', e => {
+  dragging = true; moved = 0;
+  lastX = e.clientX; lastY = e.clientY;
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', e => {
+  const rect = canvas.getBoundingClientRect();
+  if(dragging){
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    moved += Math.abs(dx) + Math.abs(dy);
+    rotY += dx*0.0085;
+    rotX += dy*0.0062;
+    rotX = Math.max(-1.25, Math.min(1.25, rotX));
+    lastX = e.clientX; lastY = e.clientY;
+  }
+  hoverCity = pickCity(e.clientX - rect.left, e.clientY - rect.top);
+  canvas.style.cursor = hoverCity ? 'pointer' : (dragging ? 'grabbing' : 'grab');
+});
+canvas.addEventListener('pointerup', e => {
+  const rect = canvas.getBoundingClientRect();
+  dragging = false;
+  try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
+  // 位移很小才算"点击"，避免拖拽旋转时误触发
+  if(moved < 6){
+    const c = pickCity(e.clientX - rect.left, e.clientY - rect.top);
+    if(c){
+      const i = selected.indexOf(c);
+      if(i >= 0) selected.splice(i,1);
+      else{
+        selected.push(c);
+        if(selected.length > 2) selected.shift();
+      }
+      syncPanel();
+    }
+  }
+  canvas.style.cursor = hoverCity ? 'pointer' : 'grab';
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  zoom = Math.max(0.65, Math.min(1.7, zoom * (e.deltaY<0?1.08:0.93)));
+  layout();
+}, {passive:false});
+canvas.style.cursor = 'grab';
+
+document.getElementById('bClear').onclick = () => { selected = []; syncPanel(); };
+const bSat = document.getElementById('bSat');
+bSat.onclick = () => { satOn = !satOn;
+  bSat.textContent = '卫星：' + (satOn?'开':'关'); bSat.classList.toggle('on', satOn); };
+const bAuto = document.getElementById('bAuto');
+bAuto.onclick = () => { auto = !auto;
+  bAuto.textContent = '自转：' + (auto?'开':'关'); bAuto.classList.toggle('on', auto); };
+
+addEventListener('resize', layout);
+layout();
+/* 默认演示：北京 → 纽约 */
+selected = [CITIES[0], CITIES[6]];
+syncPanel();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
