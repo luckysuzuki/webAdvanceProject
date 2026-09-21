@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>成绩统计 - 学习通</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="grades">
+
+  <!-- 顶部导航栏 -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="logo" href="home.html">
+        <span class="logo-mark">学</span>学习通<small>STUDY</small>
+      </a>
+      <div class="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+        <input type="text" placeholder="搜索课程 / 作业 / 资料">
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" title="消息通知">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+          <span class="dot">3</span>
+        </button>
+        <div class="user" id="userBox" title="点击退出登录">
+          <div class="avatar">张</div>
+          <div>
+            <div class="user-name">张同学</div>
+            <div class="user-role user-code">某某大学 · 20230001</div>
+          </div>
+        </div>
+        <button class="icon-btn" id="logoutBtn" title="退出登录">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主导航 -->
+  <nav class="main-nav">
+    <div class="main-nav-inner">
+      <a class="nav-tab" data-nav="home" href="home.html">首页</a>
+      <a class="nav-tab" data-nav="homework" href="homework.html">作业</a>
+      <a class="nav-tab" data-nav="experiment" href="experiment.html">实验</a>
+      <a class="nav-tab" data-nav="grades" href="grades.html">成绩统计</a>
+    </div>
+  </nav>
+
+  <!-- 页面内容 -->
+  <main class="page">
+    <div class="container">
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">成绩统计</h1>
+          <p class="page-sub">总评 = 平时成绩 × 30% + 实验成绩 × 30% + 期末成绩 × 40%</p>
+        </div>
+      </div>
+
+      <!-- 概览 -->
+      <section class="grade-summary">
+        <div class="card grade-hero">
+          <div class="big" id="grade-avg">0</div>
+          <div class="label">平均总评（分）</div>
+          <div class="delta up">较上次 ↑ 2.4</div>
+        </div>
+        <div class="card grade-hero">
+          <div class="big" id="grade-max">0</div>
+          <div class="label">最高分（分）</div>
+          <div class="delta up">Web 前端开发</div>
+        </div>
+        <div class="card grade-hero">
+          <div class="big" id="grade-min">0</div>
+          <div class="label">最低分（分）</div>
+          <div class="delta down">操作系统</div>
+        </div>
+        <div class="card grade-hero">
+          <div class="big" id="grade-credit">0</div>
+          <div class="label">已修学分</div>
+          <div class="delta">本学期</div>
+        </div>
+      </section>
+
+      <!-- 图表 -->
+      <section class="chart-grid">
+        <div class="card">
+          <div class="card-title">各科总评成绩</div>
+          <div class="chart-box"><canvas id="gradeBarChart" data-height="300"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">历次测验成绩趋势</div>
+          <div class="chart-box"><canvas id="trendChart" data-height="300"></canvas></div>
+          <div class="legend">
+            <span><i style="background:#2b7de9"></i>我的成绩</span>
+            <span><i style="background:#c0cbd9"></i>班级平均</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 明细表 -->
+      <section class="card" style="margin-top:18px">
+        <div class="card-title">各科成绩明细</div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>课程名称</th>
+                <th>平时成绩（30%）</th>
+                <th>实验成绩（30%）</th>
+                <th>期末成绩（40%）</th>
+                <th>总评</th>
+                <th>绩点</th>
+              </tr>
+            </thead>
+            <tbody id="gradeBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="js/data.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    XLS.initShell();
+    XLS.renderGrades();
+  </script>
+</body>
+</html>

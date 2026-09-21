@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>首页 - 学习通</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="home">
+
+  <!-- 顶部导航栏 -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="logo" href="home.html">
+        <span class="logo-mark">学</span>学习通<small>STUDY</small>
+      </a>
+      <div class="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+        <input type="text" placeholder="搜索课程 / 作业 / 资料">
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" title="消息通知">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+          <span class="dot">3</span>
+        </button>
+        <div class="user" id="userBox" title="点击退出登录">
+          <div class="avatar">张</div>
+          <div>
+            <div class="user-name">张同学</div>
+            <div class="user-role user-code">某某大学 · 20230001</div>
+          </div>
+        </div>
+        <button class="icon-btn" id="logoutBtn" title="退出登录">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主导航 -->
+  <nav class="main-nav">
+    <div class="main-nav-inner">
+      <a class="nav-tab" data-nav="home" href="home.html">首页</a>
+      <a class="nav-tab" data-nav="homework" href="homework.html">作业</a>
+      <a class="nav-tab" data-nav="experiment" href="experiment.html">实验</a>
+      <a class="nav-tab" data-nav="grades" href="grades.html">成绩统计</a>
+    </div>
+  </nav>
+
+  <!-- 页面内容 -->
+  <main class="page">
+    <div class="container">
+
+      <!-- 欢迎横幅 -->
+      <section class="hero">
+        <h2 id="heroTitle">你好，同学，欢迎回来！</h2>
+        <p id="heroSub">你共有 N 门课程在进行中，今天也要加油学习哦。</p>
+      </section>
+
+      <!-- 统计卡片 -->
+      <section class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-icon blue">📚</div>
+          <div><div class="stat-num" id="stat-course">0</div><div class="stat-label">我的课程</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange">📝</div>
+          <div><div class="stat-num" id="stat-homework">0</div><div class="stat-label">待交作业</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green">🧪</div>
+          <div><div class="stat-num" id="stat-experiment">0</div><div class="stat-label">进行中实验</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red">📊</div>
+          <div><div class="stat-num" id="stat-grade">0</div><div class="stat-label">平均成绩</div></div>
+        </div>
+      </section>
+
+      <!-- 我的课程 -->
+      <section class="card">
+        <div class="card-title">我的课程 <a class="more" href="homework.html">查看全部 →</a></div>
+        <div class="course-grid" id="courseGrid"></div>
+      </section>
+
+      <!-- 通知公告 -->
+      <section class="card" style="margin-top:18px">
+        <div class="card-title">通知公告</div>
+        <ul class="notice-list" id="noticeList"></ul>
+      </section>
+
+    </div>
+  </main>
+
+  <script src="js/data.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    XLS.initShell();
+    XLS.renderHome();
+  </script>
+</body>
+</html>
